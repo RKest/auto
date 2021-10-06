@@ -4,6 +4,8 @@ const sleep = util.promisify(setTimeout);
 const LOCATION = "https://gero.icnea.net";
 const DEF_LOCATION = LOCATION + "/HosOrdEntrades.aspx"
 
+
+const howManyNights = "#liNits";
 const tableReqQuerySelectorAll = ".table-condensed > tbody > tr > td:nth-child(14n + 5) > a";
 const tableServiceSelectorAll = ".table-condensed > tbody > tr > td:nth-child(14n + 13)";
 const guestTableRowSelectorAll = ".table-condensed > tbody > tr";
@@ -14,7 +16,7 @@ const bookingTabAnchorSelector = "a#Menus_M1";
 const guestsTabAnchorSelector = "a#Menus_M2";
 
 const url_guest_appSelector = "a#App";
-const pageGotoOptions = { waitUntil: "networkidle0" };
+const pageGotoOptions = { waitUntil: "networkidle2" };
 
 const awaitClick = async (el, page) => {
     await Promise.all([
@@ -38,7 +40,7 @@ const scrape = async () => {
     for(const query of reqQueries){
         const temp_page = await browser.newPage();
         await temp_page.goto(query, pageGotoOptions);
-
+        
         var noPersons = 0;
         for(const personsSelector of personsSelectors)
             noPersons += +(await temp_page.$eval(personsSelector, el => el.value));
@@ -58,12 +60,16 @@ const scrape = async () => {
             return lastElNodes.length === 1;
         });
         hasPaidDeposits.push(hasPaidDeposit);        
+        const howLongStay = await temp_page.$eval(howManyNights, el => 
+            +el.childNodes[4].textContent.trim());
+        console.log({howLongStay});
 
         const guestsTabAnchor = await temp_page.$(guestsTabAnchorSelector);
         await awaitClick(guestsTabAnchor, temp_page);
         const guestTrs = await temp_page.$$(guestTableRowSelectorAll);
         hasGuestsFIlledOut.push(!!guestTrs.length && guestTrs.length === noPersons);
         
+
         temp_page.close();
     }
 
