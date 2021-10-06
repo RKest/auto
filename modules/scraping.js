@@ -9,7 +9,7 @@ const tableServiceSelectorAll = ".table-condensed > tbody > tr > td:nth-child(14
 const guestTableRowSelectorAll = ".table-condensed > tbody > tr";
 const doesHaveVirtualCardTextareaDeterminatorSelector = "textarea#obs_canal";
 const personsSelectors = ["input#personesG, input#personesG, input#personesG"];
-const hasPaidTheDepositCandidateSelector = "td.text-right:not(.text-danger:not(.form-inline):not([colspan='2'])";
+const hasPaidTheDepositCandidateSelector = "td.text-right:not(.text-danger):not(.form-inline):not([colspan='2'])";
 const bookingTabAnchorSelector = "a#Menus_M1";
 const guestsTabAnchorSelector = "a#Menus_M2";
 
@@ -52,15 +52,18 @@ const scrape = async () => {
 
         const bookingTabAnchor = await temp_page.$(bookingTabAnchorSelector);
         await awaitClick(bookingTabAnchor, temp_page);
+
+        const hasPaidDeposit = await temp_page.$$eval(hasPaidTheDepositCandidateSelector, els => {
+            const lastElNodes = els[els.length - 1].childNodes;
+            return lastElNodes.length === 1;
+        });
+        hasPaidDeposits.push(hasPaidDeposit);        
+
         const guestsTabAnchor = await temp_page.$(guestsTabAnchorSelector);
         await awaitClick(guestsTabAnchor, temp_page);
         const guestTrs = await temp_page.$$(guestTableRowSelectorAll);
         hasGuestsFIlledOut.push(!!guestTrs.length && guestTrs.length === noPersons);
-
-        const hasPaidTheDeposidCandidates = await temp_page.$$(hasPaidTheDepositCandidateSelector);
-        const lastHasPaidTheDeposidCandidate = hasPaidTheDeposidCandidates[hasPaidTheDeposidCandidates.length - 1];
-        const lastHasPaidTheDeposidCandidateNodes = temp_page.evaluate(el => el.childNodes, )     
-
+        
         temp_page.close();
     }
 
