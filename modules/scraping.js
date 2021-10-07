@@ -39,8 +39,8 @@ const scrape = async () => {
     const page = await browser.newPage();
     await page.goto(DEF_LOCATION, pageGotoOptions);
 
-    const Contents = [];
-    const Headers = [];
+    var Contents = [];
+    var Headers = [];
     const reqQueries = await page.$$eval(tableReqQuerySelectorAll, els => els.map(el => el.href));
     for(var i = tableReqQueryOffset + 1; i < NO_TABLE_COLS; i++){
         const contentsSelectorAll = `.table-condensed > tbody > tr > td:nth-child(${NO_TABLE_COLS}n + ${i})`;
@@ -144,6 +144,8 @@ const scrape = async () => {
     console.log({paymentDifferences});
 
     page.close();
+    Headers = [...Headers, "Has Paid", "Has Paid Deposit", "Has Filled Out GUests"];
+    Contents = [...Contents, hasPaidThePrices, hasPaidDeposits, hasGuestsFIlledOut];
     return {Headers, Contents};
 }
 
