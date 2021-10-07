@@ -15,6 +15,13 @@ const parse = obj => {
     for(var i = 0; i < contents[0].length; i++){
         var contentsString = "";
         for(var j = 0; j < contents.length; j++){
+            var cont = contents[j][j];
+            if(typeof(cont) === "boolean")
+                if(cont)
+                    cont = "✓";
+                else
+                    cont = "☓";
+
             contentsString += `<td>${contents[j][i]}</td>`;
         }
         contentsStrings.push(contentsString);
