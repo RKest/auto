@@ -4,8 +4,6 @@ const parse = obj => {
     const headers = obj.Headers;
     const contents = obj.Contents;
 
-    var retHtml = "";
-
     var headersString = "";
     var contentsStrings = [];
     for(var i = 0; i < headers.length; i++){
@@ -16,7 +14,7 @@ const parse = obj => {
         var contentsString = "";
         for(var j = 0; j < contents.length; j++){
             var cont = contents[j][j];
-            if(typeof(cont) === "boolean")
+            if(typeof cont === "boolean")
                 if(cont)
                     cont = "✓";
                 else
