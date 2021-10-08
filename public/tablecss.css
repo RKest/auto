@@ -1,4 +1,4 @@
-#XD{
+table{
     
     border-collapse: collapse;
     border-top: 1px solid;
@@ -6,12 +6,12 @@
     text-align: center;
     width: 100%;
 }
-#XD tr:nth-child(2n+1){
-    background-color: rgb(231, 224, 224);
+table tr:nth-child(2n+1){
+    border-top: 1px solid;
+    border-bottom: 1px solid;
+    background-color: rgba(212, 212, 212, 0.993);
 }
-#XD table:nth-child(n){
-    border: 2px solid;
-}
+
 img{
     height: 100px;
     padding: 9px;

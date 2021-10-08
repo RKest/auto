@@ -41,7 +41,19 @@ const parse = obj => {
         </tbody>
     </table>`;
 
-    return fullTableString;
+    const retHtml = 
+    `<html>
+    <head>
+    <link rel="stylesheet" href="tablecss.css">
+    </head>
+    <body>
+        <header>
+            <img src="logo.png">
+        </header>
+        ${fullTableString}
+    </body>
+    </html>`;
+    return retHtml;
 }
 
 module.exports.parse = parse;
