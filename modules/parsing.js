@@ -15,12 +15,12 @@ const parse = obj => {
         for(var j = 0; j < contents.length; j++){
             var cont = contents[j][j];
             if(typeof cont === "boolean")
-                if(cont)
+                if(cont === true)
                     cont = "✓";
                 else
                     cont = "☓";
 
-            contentsString += `<td>${contents[j][i]}</td>`;
+            contentsString += `<td>${cont}</td>`;
         }
         contentsStrings.push(contentsString);
     }

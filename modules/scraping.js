@@ -34,9 +34,21 @@ const awaitClick = async (el, page) => {
     ]);
 }
 
+//StringFormat is dd/mm/yyyy
+const nDaysFromGivenDate = (dateString, num) => {
+    const date = new Date(dateString);
+    const nDaysFromDate = new Date(date.getDate() * num);
+    const day   = +nDaysFromDate.toLocaleDateString("en-US", { day:   numeric });
+    const month = +nDaysFromDate.toLocaleDateString("en-US", { month: numeric });
+    const year  = +nDaysFromDate.toLocaleDateString("en-US", { year:  numeric });
+    return `${day}/${month}/${year}`;
+}
+
 const scrape = async () => {
     const browserURL = "http://127.0.0.1:9222";
     const browser = await puppeteer.connect({browserURL});
+    const cleanApts = await cleanApartamentNames(browser);
+    console.log(cleanApts);
     const page = await browser.newPage();
     await page.goto(DEF_LOCATION, pageGotoOptions);
 
@@ -63,6 +75,7 @@ const scrape = async () => {
         const query = reqQueries[i];
         const temp_page = await browser.newPage();
         await temp_page.goto(query, pageGotoOptions);
+        await temp_page.exposeFunction("nDaysFromGivenDate", nDaysFromGivenDate);
         
         var noPersons = 0;
         for(const personsSelector of personsSelectors)
@@ -73,24 +86,23 @@ const scrape = async () => {
         const url_guest_app = await temp_page.$eval(url_guest_appSelector, el => el.href);
         urlGuestApps.push(url_guest_app);
 
-        const hasVC = await temp_page.$eval(doesHaveVirtualCardTextareaDeterminatorSelector, 
+        const service = services[i];
+        const hasVC = service === "expedia" || await temp_page.$eval(doesHaveVirtualCardTextareaDeterminatorSelector, 
                 el => /crédito virtual/.test(el.textContent.trim()));
         const bookingTabAnchor = await temp_page.$(bookingTabAnchorSelector);
         await awaitClick(bookingTabAnchor, temp_page);
-
         /*
         const howLongStay = await temp_page.$eval(howManyNights, el => 
             +el.childNodes[4].textContent.trim());
         */
-        const service = services[i];
-        if(service === "booking")
+        if(service === "booking" || service === "holidu" || service === "directas" || service === "expedia")
         {
             const toPayAmout = await temp_page.$eval(toPayAmountSelector, el => 
                 +el.textContent.trim().slice(0, -2));
             const difference = await temp_page.$eval(outstandingPaymentSelector, el => 
                 +el.textContent.trim().slice(0,-2));
-            const hasMadeDepositTransaction = await temp_page.$$eval((hasPaidTheDepositCandidateSelector, 
-                departureDate), els => {
+            const hasMadeDepositTransaction = await temp_page.$$eval(hasPaidTheDepositCandidateSelector, 
+                 (els, departureDate) => {
                 const lastEl = els[els.length - 1];
                 const lastElNodes = lastEl.childNodes;
                 if(lastElNodes.length === 1)
@@ -98,8 +110,8 @@ const scrape = async () => {
                     const lastElParent = lastEl.parentNode;
                     const lastElParentFirstTd = lastElParent.childNodes[1];
                     const paymentDateAsString = lastElParentFirstTd.textContent.trim();
-                    const paymentDatePlusSevenDays = nDaysFromGivenDate(paymentDateAsString, 7);
-                    return paymentDatePlusSevenDays < departureDate;
+                    const paymentDatePlusSixDays = nDaysFromGivenDate(paymentDateAsString, 6);
+                    return paymentDatePlusSixDays > departureDate;
                 }
                 return false;
             }, departureDate);
@@ -108,7 +120,8 @@ const scrape = async () => {
                 for(var i = 0; i < els.length; i++){
                     const elsChildrenNodes = els[i].childNodes;
                     const elsTitleNode = elsChildrenNodes[1].textContent.trim();
-                    if(elsTitleNode === "deposit")
+                    const elsTitleNodeLC = elsTitleNode.toLowerCase();
+                    if(elsTitleNodeLC === "deposit" || elsTitleNodeLC === "depósito" || elsTitleNodeLC === "fianza")
                         ret = true;
                 }
                 return ret;
@@ -141,7 +154,7 @@ const scrape = async () => {
             paymentDifferences.push(0);
         }
         else
-            throw "Unknown service"
+            throw `Unknown service ${service}`
 
         const guestsTabAnchor = await temp_page.$(guestsTabAnchorSelector);
         await awaitClick(guestsTabAnchor, temp_page);
@@ -149,7 +162,7 @@ const scrape = async () => {
         hasGuestsFIlledOut.push(!!guestTrs.length && guestTrs.length === noPersons);
         const passportNumbers = await temp_page.$$eval(tablePassportNumberSelector, els => 
             els.map(el => el.textContent.trim()));
-        const areAllPassportNumbersValid = passportNumbers.every(isPassportValid);
+        const areAllPassportNumbersValid = passportNumbers.length && passportNumbers.every(isPassportValid);
         areAllPassportsValids.push(areAllPassportNumbersValid);
 
         temp_page.close();
@@ -165,7 +178,6 @@ const isPassportValid = str => {
     //https://towardsdatascience.com/exploratory-data-analysis-passport-numbers-in-pandas-4ccb567115b6
     if(str.length < 3 || str.length > 17)
         return false;
-    var numAcc  = 0;
     var charAcc = 0;
     for(var i = 0; i < str.length; i++){
         const isNum = !Number.isNaN(+str[i]);
@@ -174,43 +186,39 @@ const isPassportValid = str => {
         else
             charAcc++;
     }
-    return numAcc >= charAcc;
+    return charAcc === str.length;
 }
 
 const apartmentCleaningTrSelectorAll = ".table-condensed > tbody > tr:not(.bg-light)";
 const cleanClassName = "text-success";
-const cleanApartamentNames = browser => {
-    const cleaningsUri = "https://gero.icnea.net/HosOrdEntrades.aspx";
-    const cleaning_page = browser.newPage();
-    cleaning_page.goto(cleaningsUri, pageGotoOptions);
-    const apartmentObjects = cleaning_page.$$eval(apartmentCleaningTrSelectorAll, els => {
-        els.map(el => {
-            const secondNode = el.childNodes[1]; 
-            const leafNode = secondNode.childNodes[1];
-            /*
-            if(leafNode === undefined){
-                const textNode = secondNode[5];
-                
-            }
-            else {
-                return {
-                    aptName: "",
-                    isClean: leafNode.classList.contains(cleanClassName);
+const cleanApartamentNames = async browser => {
+    const cleaningsUri = "https://gero.icnea.net/HosOrdNetejes.aspx";
+    const cleaning_page = await browser.newPage();
+    await cleaning_page.goto(cleaningsUri, pageGotoOptions);
+    const apartmentObjects = await cleaning_page.$$eval(apartmentCleaningTrSelectorAll, 
+        (els, cleanClassName) => {
+            return els.map(el => {
+                const secondNode = el.childNodes[1]; 
+                const leafNode = secondNode.childNodes[1];
+                const textNode = el.childNodes[5].childNodes[1];
+                const textNodeContent = textNode.textContent.trim();
+                if(leafNode === undefined){
+                    return {
+                        aptName: textNodeContent.slice(1, -1),
+                        isClean: textNode.classList.contains(cleanClassName)
+                    }
                 }
-            }
-            */
-        });
-    });
-};
+                else {
+                    const leafSpan = leafNode.childNodes[0];
+                    return {
+                        aptName: textNodeContent,
+                        isClean: leafSpan.classList.contains(cleanClassName)
+                    }
+                }
 
-//StringFormat is dd/mm/yyyy
-const nDaysFromGivenDate = (dateString, num) => {
-    const date = new Date(dateString);
-    const nDaysFromDate = new Date(date.getDate() * num);
-    const day   = +nDaysFromDate.toLocaleDateString("en-US", { day:   numeric });
-    const month = +nDaysFromDate.toLocaleDateString("en-US", { month: numeric });
-    const year  = +nDaysFromDate.toLocaleDateString("en-US", { year:  numeric });
-    return `${day}/${month}/${year}`;
-}
+            });
+    }, cleanClassName);
+    return apartmentObjects.filter(el => el.isClean).map(el => el.aptName);
+};
 
 exports.scrape = scrape;
