@@ -9,7 +9,8 @@ const DEPOSIT_AMOUNT = 150.0;
 const NO_TABLE_COLS = 14;
 
 //const howManyNights = "#liNits";
-const tableReqQueryOffset = 5;
+const initialOffset = 5;
+const tablePropertyOffset = 2;
 
 const tablePassportNumberSelector = ".table-condensed > tbody > tr > td:nth-child(7)";
 const tableReqQuerySelectorAll = ".table-condensed > tbody > tr > td:nth-child(14n + 5) > a";
@@ -48,14 +49,13 @@ const scrape = async () => {
     const browserURL = "http://127.0.0.1:9222";
     const browser = await puppeteer.connect({browserURL});
     const cleanApts = await cleanApartamentNames(browser);
-    console.log(cleanApts);
     const page = await browser.newPage();
     await page.goto(DEF_LOCATION, pageGotoOptions);
 
     var Contents = [];
     var Headers = [];
     const reqQueries = await page.$$eval(tableReqQuerySelectorAll, els => els.map(el => el.href));
-    for(var i = tableReqQueryOffset + 1; i < NO_TABLE_COLS; i++){
+    for(var i = initialOffset + 1; i < NO_TABLE_COLS; i++){
         const contentsSelectorAll = `.table-condensed > tbody > tr > td:nth-child(${NO_TABLE_COLS}n + ${i})`;
         const headersSelector = `.table-condensed > thead > tr > th:nth-child(${i})`;
         const data = await page.$$eval(contentsSelectorAll, els => els.map(el => el.textContent.trim()));
@@ -64,13 +64,17 @@ const scrape = async () => {
         Headers.push(head);
     }
 
+    Contents = [reqQueries, ...Contents];
     const services = Contents[Contents.length - 1];
+    const properties = Contents[tablePropertyOffset];
+
     const hasGuestsFIlledOut = [];
     const hasPaidThePrices = [];
     const hasPaidDeposits = [];
     const urlGuestApps = [];
     const paymentDifferences = [];
     const areAllPassportsValids = [];
+    const areTheApartmentClean = properties.map(el => cleanApts.includes(el));
     for(var i = 0; i < reqQueries.length; i++){
         const query = reqQueries[i];
         const temp_page = await browser.newPage();
@@ -169,8 +173,10 @@ const scrape = async () => {
     }
 
     page.close();
-    Headers = [...Headers, "Has Paid", "Has Paid Deposit", "Has Filled Out Guests", "Are All Passports Valid"];
-    Contents = [...Contents, hasPaidThePrices, hasPaidDeposits, hasGuestsFIlledOut, areAllPassportsValids];
+    Headers = [...Headers, "Has Paid", "Has Paid Deposit", "Has Filled Out Guests", 
+        "Are All Passports Valid", "Is Apartment Clean"];
+    Contents = [...Contents, hasPaidThePrices, hasPaidDeposits, hasGuestsFIlledOut, 
+        areAllPassportsValids, areTheApartmentClean];
     return {Headers, Contents};
 }
 
@@ -181,9 +187,7 @@ const isPassportValid = str => {
     var charAcc = 0;
     for(var i = 0; i < str.length; i++){
         const isNum = !Number.isNaN(+str[i]);
-        if(isNum)
-            numAcc++;
-        else
+        if(!isNum)
             charAcc++;
     }
     return charAcc === str.length;
@@ -194,6 +198,9 @@ const cleanClassName = "text-success";
 const cleanApartamentNames = async browser => {
     const cleaningsUri = "https://gero.icnea.net/HosOrdNetejes.aspx";
     const cleaning_page = await browser.newPage();
+    await cleaning_page
+        .on('console', message =>
+          console.log(`${message.type().substr(0, 3).toUpperCase()} ${message.text()}`))
     await cleaning_page.goto(cleaningsUri, pageGotoOptions);
     const apartmentObjects = await cleaning_page.$$eval(apartmentCleaningTrSelectorAll, 
         (els, cleanClassName) => {
@@ -210,10 +217,17 @@ const cleanApartamentNames = async browser => {
                 }
                 else {
                     const leafSpan = leafNode.childNodes[0];
-                    return {
-                        aptName: textNodeContent,
-                        isClean: leafSpan.classList.contains(cleanClassName)
-                    }
+                    if(leafSpan !== undefined)
+                        return {
+                            aptName: textNodeContent,
+                            isClean: leafSpan.classList.contains(cleanClassName)
+                        }
+                    else
+                        return {
+                            aptName: textNodeContent,
+                            isClean: leafNode.classList.contains(cleanClassName)
+                            
+                        }
                 }
 
             });
