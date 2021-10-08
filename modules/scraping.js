@@ -10,7 +10,7 @@ const NO_TABLE_COLS = 14;
 
 //const howManyNights = "#liNits";
 const initialOffset = 5;
-const tablePropertyOffset = 2;
+const tablePropertyOffset = 1;
 
 const tablePassportNumberSelector = ".table-condensed > tbody > tr > td:nth-child(7)";
 const tableReqQuerySelectorAll = ".table-condensed > tbody > tr > td:nth-child(14n + 5) > a";
@@ -19,7 +19,7 @@ const doesHaveVirtualCardTextareaDeterminatorSelector = "textarea#obs_canal";
 const depositHasBenDeclaredDeterminantSelectorAll = ".table-condensed > tbody > tr";
 const hasPaidTheDepositCandidateSelector = "td.text-right:not(.text-danger):not(.form-inline):not([colspan='2'])";
 const toPayAmountSelector = ".warning > td > strong";
-const personsSelectors = ["input#personesG, input#personesG, input#personesG"];
+const personsSelectors = ["input#personesG", "input#personesM", "input#personesP"];
 const outstandingPaymentSelector = "td > strong.text-danger";
 const bookingTabAnchorSelector = "a#Menus_M1";
 const guestsTabAnchorSelector = "a#Menus_M2";
@@ -35,14 +35,18 @@ const awaitClick = async (el, page) => {
     ]);
 }
 
+const dateFromString = dateString => {
+    const parts = dateString.split("/");
+    return new Date(parseInt(parts[2], 10),
+                    parseInt(parts[1], 10) - 1,
+                    parseInt(parts[0], 10));
+}
+
 //StringFormat is dd/mm/yyyy
 const nDaysFromGivenDate = (dateString, num) => {
-    const date = new Date(dateString);
-    const nDaysFromDate = new Date(date.getDate() * num);
-    const day   = +nDaysFromDate.toLocaleDateString("en-US", { day:   numeric });
-    const month = +nDaysFromDate.toLocaleDateString("en-US", { month: numeric });
-    const year  = +nDaysFromDate.toLocaleDateString("en-US", { year:  numeric });
-    return `${day}/${month}/${year}`;
+    const date = dateFromString(dateString);
+    date.setDate(date.getDate() + num);
+    return date;
 }
 
 const scrape = async () => {
@@ -75,19 +79,23 @@ const scrape = async () => {
     const urlGuestApps = [];
     const paymentDifferences = [];
     const areAllPassportsValids = [];
-    const areTheApartmentClean = properties.map(el => cleanApts.includes(el));
-    for(var i = 0; i < reqQueries.length; i++){
+    const areTheApartmentClean = properties.map(el => cleanApts.some(apt => 
+            el.toLowerCase().includes(apt.toLowerCase())));
+
+    for(var i = 14; i < reqQueries.length; i++){
         const query = reqQueries[i];
         const temp_page = await browser.newPage();
+        temp_page.on('console', message =>
+            console.log(`${message.type().substr(0, 3).toUpperCase()} ${message.text()}`));
         await temp_page.goto(query, pageGotoOptions);
         await temp_page.exposeFunction("nDaysFromGivenDate", nDaysFromGivenDate);
+        await temp_page.exposeFunction("dateFromString", dateFromString);
         
         var noPersons = 0;
         for(const personsSelector of personsSelectors)
             noPersons += +(await temp_page.$eval(personsSelector, el => el.value));
 
-        const departureDate = await temp_page.$eval(departureDateSelector, 
-            el => new Date(el.value));
+        const departureDate = await temp_page.$eval(departureDateSelector, el => el.value);
         const url_guest_app = await temp_page.$eval(url_guest_appSelector, el => el.href);
         urlGuestApps.push(url_guest_app);
 
@@ -106,8 +114,9 @@ const scrape = async () => {
                 +el.textContent.trim().slice(0, -2));
             const difference = await temp_page.$eval(outstandingPaymentSelector, el => 
                 +el.textContent.trim().slice(0,-2));
+            console.log({i});
             const hasMadeDepositTransaction = await temp_page.$$eval(hasPaidTheDepositCandidateSelector, 
-                 (els, departureDate) => {
+                 async (els, departureDate) => {
                 const lastEl = els[els.length - 1];
                 const lastElNodes = lastEl.childNodes;
                 if(lastElNodes.length === 1)
@@ -115,18 +124,28 @@ const scrape = async () => {
                     const lastElParent = lastEl.parentNode;
                     const lastElParentFirstTd = lastElParent.childNodes[1];
                     const paymentDateAsString = lastElParentFirstTd.textContent.trim();
-                    const paymentDatePlusSixDays = nDaysFromGivenDate(paymentDateAsString, 6);
-                    return paymentDatePlusSixDays > departureDate;
+                    const paymentDateTrimmed = paymentDateAsString.slice(-10);
+                    console.log("PDT: ", paymentDateTrimmed);
+                    const paymentDatePlusSevenDays = await nDaysFromGivenDate(paymentDateTrimmed, 7);
+                    const departureDateAsDate = await dateFromString(departureDate);
+                    console.log("D: ", departureDateAsDate.toString());
+                    console.log("P: ", paymentDatePlusSevenDays.toString());
+                    console.log(paymentDatePlusSevenDays > departureDateAsDate);
+                    return paymentDatePlusSevenDays > departureDateAsDate;
                 }
                 return false;
             }, departureDate);
+            
             const hasDepositExtra = await temp_page.$$eval(depositHasBenDeclaredDeterminantSelectorAll, els => {
                 var ret = false;
                 for(var i = 0; i < els.length; i++){
                     const elsChildrenNodes = els[i].childNodes;
                     const elsTitleNode = elsChildrenNodes[1].textContent.trim();
                     const elsTitleNodeLC = elsTitleNode.toLowerCase();
-                    if(elsTitleNodeLC === "deposit" || elsTitleNodeLC === "depósito" || elsTitleNodeLC === "fianza")
+                    if(elsTitleNodeLC === "deposit" || 
+                       elsTitleNodeLC === "depósito" || 
+                       elsTitleNodeLC === "fianza" ||
+                       elsTitleNodeLC === "deposito")
                         ret = true;
                 }
                 return ret;
@@ -134,9 +153,13 @@ const scrape = async () => {
             if(hasVC)
             {
                 const hasPaidDeposit = 
-                    ( hasDepositExtra && Math.abs(toPayAmout - difference - DEPOSIT_AMOUNT) < INDIFFERENCE_AMOUNT) ||
-                    (!hasDepositExtra && Math.abs(toPayAmout - difference) < INDIFFERENCE_AMOUNT) ||
+                    ( hasDepositExtra && Math.abs(toPayAmout - difference) < INDIFFERENCE_AMOUNT) ||
+                    (!hasDepositExtra && Math.abs(toPayAmout - difference - DEPOSIT_AMOUNT) < INDIFFERENCE_AMOUNT) ||
                     hasMadeDepositTransaction;
+                if(i === 15)
+                {
+                    console.log(hasPaidDeposit);
+                }
                 hasPaidDeposits.push(hasPaidDeposit);
                 hasPaidThePrices.push(true);
                 paymentDifferences.push(0);
@@ -167,7 +190,7 @@ const scrape = async () => {
         hasGuestsFIlledOut.push(!!guestTrs.length && guestTrs.length === noPersons);
         const passportNumbers = await temp_page.$$eval(tablePassportNumberSelector, els => 
             els.map(el => el.textContent.trim()));
-        const areAllPassportNumbersValid = passportNumbers.length && passportNumbers.every(isPassportValid);
+        const areAllPassportNumbersValid = !!passportNumbers.length && passportNumbers.every(isPassportValid);
         areAllPassportsValids.push(areAllPassportNumbersValid);
 
         temp_page.close();
@@ -191,7 +214,7 @@ const isPassportValid = str => {
         if(!isNum)
             charAcc++;
     }
-    return charAcc === str.length;
+    return charAcc !== str.length;
 }
 
 const apartmentCleaningTrSelectorAll = ".table-condensed > tbody > tr:not(.bg-light)";
@@ -199,9 +222,6 @@ const cleanClassName = "text-success";
 const cleanApartamentNames = async browser => {
     const cleaningsUri = "https://gero.icnea.net/HosOrdNetejes.aspx";
     const cleaning_page = await browser.newPage();
-    await cleaning_page
-        .on('console', message =>
-          console.log(`${message.type().substr(0, 3).toUpperCase()} ${message.text()}`))
     await cleaning_page.goto(cleaningsUri, pageGotoOptions);
     const apartmentObjects = await cleaning_page.$$eval(apartmentCleaningTrSelectorAll, 
         (els, cleanClassName) => {
@@ -233,6 +253,7 @@ const cleanApartamentNames = async browser => {
 
             });
     }, cleanClassName);
+    cleaning_page.close();
     return apartmentObjects.filter(el => el.isClean).map(el => el.aptName);
 };
 
