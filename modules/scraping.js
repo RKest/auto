@@ -10,6 +10,7 @@ const NO_TABLE_COLS = 14;
 
 //const howManyNights = "#liNits";
 const initialOffset = 5;
+const tableDateTimeOffset = 0;
 const tablePropertyOffset = 1;
 
 const tablePassportNumberSelector = ".table-condensed > tbody > tr > td:nth-child(7)";
@@ -27,6 +28,12 @@ const departureDateSelector = "input#sortida";
 
 const url_guest_appSelector = "a#App";
 const pageGotoOptions = { waitUntil: "networkidle2" };
+
+const splitDateTime = dateString => {
+    const datePart = dateString.slice(0, 10).trim();
+    const timePart = dateString.slice(11).trim();
+    return [datePart, timePart];
+}
 
 const awaitClick = async (el, page) => {
     await Promise.all([
@@ -54,7 +61,7 @@ const scrape = async () => {
     const browser = await puppeteer.connect({browserURL});
     const cleanApts = await cleanApartamentNames(browser);
     const page = await browser.newPage();
-    await page.goto(DEF_LOCATION, pageGotoOptions);
+    await page.goto("https://gero.icnea.net/HosOrdEntrades.aspx?data=09/10/2021&Tar=0", pageGotoOptions);
 
     var Contents = [];
     var Headers = [];
@@ -69,9 +76,11 @@ const scrape = async () => {
         Headers.push(head);
     }
 
-    Contents = [...Contents];
     const services = Contents[Contents.length - 1];
     const properties = Contents[tablePropertyOffset];
+    const splitDatesList = Contents[tableDateTimeOffset].map(el => splitDateTime(el));
+    Contents = [splitDatesList.map(el => el[0]), splitDatesList.map(el => el[1]), ...Contents.slice(1)];
+    Headers = ["Date", "Time", ...Headers.slice(1)];
 
     const hasGuestsFIlledOut = [];
     const hasPaidThePrices = [];
@@ -82,7 +91,7 @@ const scrape = async () => {
     const areTheApartmentClean = properties.map(el => cleanApts.some(apt => 
             el.toLowerCase().includes(apt.toLowerCase())));
 
-    for(var i = 14; i < reqQueries.length; i++){
+    for(var i = 0; i < reqQueries.length; i++){
         const query = reqQueries[i];
         const temp_page = await browser.newPage();
         temp_page.on('console', message =>
@@ -114,7 +123,6 @@ const scrape = async () => {
                 +el.textContent.trim().slice(0, -2));
             const difference = await temp_page.$eval(outstandingPaymentSelector, el => 
                 +el.textContent.trim().slice(0,-2));
-            console.log({i});
             const hasMadeDepositTransaction = await temp_page.$$eval(hasPaidTheDepositCandidateSelector, 
                  async (els, departureDate) => {
                 const lastEl = els[els.length - 1];
@@ -125,12 +133,8 @@ const scrape = async () => {
                     const lastElParentFirstTd = lastElParent.childNodes[1];
                     const paymentDateAsString = lastElParentFirstTd.textContent.trim();
                     const paymentDateTrimmed = paymentDateAsString.slice(-10);
-                    console.log("PDT: ", paymentDateTrimmed);
                     const paymentDatePlusSevenDays = await nDaysFromGivenDate(paymentDateTrimmed, 7);
                     const departureDateAsDate = await dateFromString(departureDate);
-                    console.log("D: ", departureDateAsDate.toString());
-                    console.log("P: ", paymentDatePlusSevenDays.toString());
-                    console.log(paymentDatePlusSevenDays > departureDateAsDate);
                     return paymentDatePlusSevenDays > departureDateAsDate;
                 }
                 return false;
@@ -155,11 +159,9 @@ const scrape = async () => {
                 const hasPaidDeposit = 
                     ( hasDepositExtra && Math.abs(toPayAmout - difference) < INDIFFERENCE_AMOUNT) ||
                     (!hasDepositExtra && Math.abs(toPayAmout - difference - DEPOSIT_AMOUNT) < INDIFFERENCE_AMOUNT) ||
+                    ( hasDepositExtra && Math.abs(difference) < INDIFFERENCE_AMOUNT) ||
+                    (!hasDepositExtra && Math.abs(difference + DEPOSIT_AMOUNT) < INDIFFERENCE_AMOUNT) ||
                     hasMadeDepositTransaction;
-                if(i === 15)
-                {
-                    console.log(hasPaidDeposit);
-                }
                 hasPaidDeposits.push(hasPaidDeposit);
                 hasPaidThePrices.push(true);
                 paymentDifferences.push(0);
