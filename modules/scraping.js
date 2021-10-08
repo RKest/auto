@@ -55,6 +55,7 @@ const scrape = async () => {
     var Contents = [];
     var Headers = [];
     const reqQueries = await page.$$eval(tableReqQuerySelectorAll, els => els.map(el => el.href));
+    const reqTexts =  await page.$$eval(tableReqQuerySelectorAll, els => els.map(el => el.textContent.trim()));
     for(var i = initialOffset + 1; i < NO_TABLE_COLS; i++){
         const contentsSelectorAll = `.table-condensed > tbody > tr > td:nth-child(${NO_TABLE_COLS}n + ${i})`;
         const headersSelector = `.table-condensed > thead > tr > th:nth-child(${i})`;
@@ -64,7 +65,7 @@ const scrape = async () => {
         Headers.push(head);
     }
 
-    Contents = [reqQueries, ...Contents];
+    Contents = [...Contents];
     const services = Contents[Contents.length - 1];
     const properties = Contents[tablePropertyOffset];
 
@@ -173,9 +174,9 @@ const scrape = async () => {
     }
 
     page.close();
-    Headers = [...Headers, "Has Paid", "Has Paid Deposit", "Has Filled Out Guests", 
+    Headers = ["Booking", ...Headers, "Has Paid", "Has Paid Deposit", "Has Filled Out Guests", 
         "Are All Passports Valid", "Is Apartment Clean"];
-    Contents = [...Contents, hasPaidThePrices, hasPaidDeposits, hasGuestsFIlledOut, 
+    Contents = [reqTexts, ...Contents, hasPaidThePrices, hasPaidDeposits, hasGuestsFIlledOut, 
         areAllPassportsValids, areTheApartmentClean];
     return {Headers, Contents};
 }

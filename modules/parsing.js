@@ -4,6 +4,8 @@ const parse = obj => {
     const headers = obj.Headers;
     const contents = obj.Contents;
 
+    console.log(JSON.stringify(obj));
+
     var headersString = "";
     var contentsStrings = [];
     for(var i = 0; i < headers.length; i++){
@@ -13,14 +15,7 @@ const parse = obj => {
     for(var i = 0; i < contents[0].length; i++){
         var contentsString = "";
         for(var j = 0; j < contents.length; j++){
-            var cont = contents[j][j];
-            if(typeof cont === "boolean")
-                if(cont === true)
-                    cont = "✓";
-                else
-                    cont = "☓";
-
-            contentsString += `<td>${cont}</td>`;
+            contentsString += `<td>${contents[j][j]}</td>`;
         }
         contentsStrings.push(contentsString);
     }
