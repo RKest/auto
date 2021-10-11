@@ -61,7 +61,7 @@ const scrape = async () => {
     const browser = await puppeteer.connect({browserURL});
     const cleanApts = await cleanApartamentNames(browser);
     const page = await browser.newPage();
-    await page.goto("https://gero.icnea.net/HosOrdEntrades.aspx?data=09/10/2021&Tar=0", pageGotoOptions);
+    await page.goto(DEF_LOCATION, pageGotoOptions);
 
     var Contents = [];
     var Headers = [];
