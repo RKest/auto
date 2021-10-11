@@ -2,8 +2,14 @@ const puppeteer = require("puppeteer");
 const util = require("util");
 const sleep = util.promisify(setTimeout);
 const LOCATION = "https://gero.icnea.net";
+<<<<<<< Updated upstream
 const LOGIN_REDIRECT_LOCATION = LOCATION + "/Servidor.aspx";
 const DEF_LOCATION = LOCATION + "/HosOrdEntrades.aspx"
+=======
+const DEF_LOCATION = LOCATION + "/HosOrdEntrades.aspx";
+
+
+>>>>>>> Stashed changes
 
 const INDIFFERENCE_AMOUNT = 10.0;
 const DEPOSIT_AMOUNT = 150.0;
@@ -144,7 +150,6 @@ const scrape = async () => {
     const browser = await puppeteer.connect({browserURL});
     const cleanApts = await cleanApartamentNames(browser);
     const page = await browser.newPage();
-    await page.goto(DEF_LOCATION, pageGotoOptions);
     const pageUrl = page.url();
     if(pageUrl === LOGIN_REDIRECT_LOCATION){
         if(!process.env.EMAIL || !process.env.PASSWORD)
@@ -157,6 +162,8 @@ const scrape = async () => {
         if(page.url() === LOGIN_REDIRECT_LOCATION)
             throw "Incorrect email or password";
     }
+    const exactLocation = DEF_LOCATION + "?data=" + searchDayForward();
+    await page.goto(exactLocation, pageGotoOptions);
 
     var Contents = [];
     var Headers = [];
@@ -303,5 +310,16 @@ const cleanApartamentNames = async browser => {
     cleaning_page.close();
     return apartmentObjects.filter(el => el.isClean).map(el => el.aptName);
 };
+
+const searchDayForward = () => {
+    const myArgs = process.argv[2] || 0;
+    const num = myArgs[0];
+    const daysForward = new Date();
+
+    daysForward.setDate(daysForward.getDate() + +num).toString(); 
+    console.log(daysForward.getDate()+"/"+(daysForward.getMonth() + 1)+"/"+daysForward.getFullYear());
+    return (daysForward.getDate()+"/"+(daysForward.getMonth() + 1)+"/"+daysForward.getFullYear());
+}
+
 
 exports.scrape = scrape;
