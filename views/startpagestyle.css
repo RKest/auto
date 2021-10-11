@@ -1,0 +1,25 @@
+input:not(#date, #button){
+    width: 250px;
+    margin: 10px;
+}
+button{
+    
+}
+#box{
+    border-radius: 10px;
+    width: 50%;
+    background-color: blue;
+    position: relative;
+    padding: 2%;
+}
+
+
+body{
+    padding-left: 25%;
+    padding-top: 25%;
+    background-color: blueviolet;
+    -webkit-font-smoothing: antialiased;
+    -webkit-text-size-adjust: 100%;
+    font-family: "Open Sans", Helvetica, Arial, sans-serif;
+    color: #666666;
+}
