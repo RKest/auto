@@ -2,14 +2,8 @@ const puppeteer = require("puppeteer");
 const util = require("util");
 const sleep = util.promisify(setTimeout);
 const LOCATION = "https://gero.icnea.net";
-<<<<<<< Updated upstream
 const LOGIN_REDIRECT_LOCATION = LOCATION + "/Servidor.aspx";
 const DEF_LOCATION = LOCATION + "/HosOrdEntrades.aspx"
-=======
-const DEF_LOCATION = LOCATION + "/HosOrdEntrades.aspx";
-
-
->>>>>>> Stashed changes
 
 const INDIFFERENCE_AMOUNT = 10.0;
 const DEPOSIT_AMOUNT = 150.0;
@@ -45,7 +39,6 @@ const tablePassportNumberSelector = ".table-condensed > tbody > tr > td:nth-chil
 
 const splitDateTime = dateStringArray => {
     const ret = [[], []];
-
     for(const dateString of dateStringArray){
         const datePart = dateString.slice(0, 10).trim();
         const timePart = dateString.slice(11).trim();
@@ -67,6 +60,12 @@ const dateFromString = dateString => {
     return new Date(parseInt(parts[2], 10),
                     parseInt(parts[1], 10) - 1,
                     parseInt(parts[0], 10));
+}
+
+const dateToString = date => {
+    return   date.toLocaleDateString("en-US", { day: 'numeric' })
+     + "/" + date.toLocaleDateString("en-US", { month: 'numeric' })  
+     + "/" + date.toLocaleDateString("en-US", { year: 'numeric' });
 }
 
 //StringFormat is dd/mm/yyyy
@@ -145,14 +144,14 @@ const hasDepositTransactionFunc = async (page, departureDate) => {
    }, departureDate);
 }
 
-const scrape = async () => {
+const scrape = async (email, passwd) => {
     const browserURL = "http://127.0.0.1:9222";
     const browser = await puppeteer.connect({browserURL});
     const cleanApts = await cleanApartamentNames(browser);
     const page = await browser.newPage();
     const pageUrl = page.url();
     if(pageUrl === LOGIN_REDIRECT_LOCATION){
-        if(!process.env.EMAIL || !process.env.PASSWORD)
+        if(!email || !passwd)
             throw "Provide email and password";
         await Promise.all([
             page.$eval(emailInpSelector,    (el, val) => el.value = val, process.env.EMAIL),
