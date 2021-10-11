@@ -15,7 +15,7 @@ const VIEW_PATH = __dirname + "/views";
 (async () => {
     app.route("/")
     .get((_, res) => {
-        res.send("Hello");
+        res.send(VIEW_PATH + "index.html");
     })
     .post((req, res) => {
         const email = req.body.email;
@@ -36,11 +36,9 @@ const VIEW_PATH = __dirname + "/views";
             res.send(e);
         });
     });
-    /*
     app.get("/data", (_, res) => {
         res.sendFile(CASHE_PATH);
     });
-    */
 })();
 
 app.listen(8080, () => {
