@@ -1,7 +1,9 @@
 const form = document.getElementById("main-form");
+const progressBar = document.getElementById("prog");
 
 form.addEventListener("submit", async e => {
     e.preventDefault();
+    progressBar.style.visibility = "visible";
     const email = form.elements.email.value;
     const passwd = form.elements.passwd.value;
     const date = form.elements.date.value;
@@ -9,9 +11,12 @@ form.addEventListener("submit", async e => {
     const data = {
         email, passwd, date
     }
+
+    const progressIntervalId = setInterval(updateProgress, 2000);
+
     fetch("/", 
     { 
-        method: "POST" ,
+        method: "POST",
         headers: {
             "Content-Type": "application/json"
         },
@@ -24,5 +29,18 @@ form.addEventListener("submit", async e => {
             window.location.replace(text);
         else
             alert(text);
+    })
+    .finally(() => {
+        clearInterval(progressIntervalId);
     });
 });
+
+const updateProgress = async () => {
+    fetch("/prog", 
+    {
+        method: "GET"
+    }).then(async res => {
+        const text = await res.text();
+        progressBar.value = text * 100;
+    });
+}

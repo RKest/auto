@@ -4,6 +4,7 @@ const sleep = util.promisify(setTimeout);
 const LOCATION = "https://gero.icnea.net";
 const LOGIN_LOCATION = LOCATION + "/Servidor.aspx";
 const DEF_LOCATION = LOCATION + "/HosOrdEntrades.aspx"
+const PROGRESS_OFFSET = 3;
 
 const INDIFFERENCE_AMOUNT = 10.0;
 const DEPOSIT_AMOUNT = 150.0;
@@ -144,13 +145,14 @@ const hasDepositTransactionFunc = async (page, departureDate) => {
 }
 
 const scrape = async (email, passwd, date, progressObj) => {
-    //const browserURL = "http://127.0.0.1:9222";
-    //const browser = await puppeteer.connect({browserURL});
     const browser = await puppeteer.launch({
-        headless: false
+        headless: true
     });
     try {
     const page = await browser.newPage();
+    page.on('dialog', async dialog => {
+        await dialog.dismiss();
+    });
     await page.goto(LOGIN_LOCATION, pageGotoOptions);
 
     if(!email || !passwd)
@@ -165,8 +167,8 @@ const scrape = async (email, passwd, date, progressObj) => {
     if(page.url() === LOGIN_LOCATION)
         throw "Incorrect email or password";
         
-    const dateString = dateToString(new Date(date));
-    const cleanApts = await cleanApartamentNames(browser);
+    const dateAsDate = date ? new Date(date) : new Date();
+    const dateString = dateToString(dateAsDate);
     const exactLocation = DEF_LOCATION + "?data=" + dateString;
     await page.goto(exactLocation, pageGotoOptions);
     var Contents = [];
@@ -182,7 +184,10 @@ const scrape = async (email, passwd, date, progressObj) => {
         Headers.push(head);
     }
 
-    progressObj.outof = Contents[0].length;
+    progressObj.outof = Contents[0].length + PROGRESS_OFFSET;
+    progressObj.i++;
+    const cleanApts = await cleanApartamentNames(browser);
+    progressObj.i++;
 
     const services = Contents[Contents.length - 1];
     const properties = Contents[tablePropertyOffset];
@@ -199,8 +204,8 @@ const scrape = async (email, passwd, date, progressObj) => {
     const areTheApartmentClean = properties.map(el => cleanApts.some(apt => 
             el.toLowerCase().includes(apt.toLowerCase())));
 
-    for(; progressObj.i < reqQueries.length; progressObj.i++){
-        const i = progressObj.i;
+    for(; progressObj.i < reqQueries.length + PROGRESS_OFFSET; progressObj.i++){
+        const i = progressObj.i - PROGRESS_OFFSET;
         const query = reqQueries[i];
         const temp_page = await browser.newPage();
         temp_page.on('console', message =>
@@ -246,7 +251,12 @@ const scrape = async (email, passwd, date, progressObj) => {
             paymentDifferences.push(0);
         }
         else
-            throw `Unknown service ${service}`
+        {
+            console.log(`Unknown service ${service}`);
+            hasPaidDeposits.push(undefined);
+            hasPaidThePrices.push(undefined);
+            paymentDifferences.push(undefined);
+        }
 
         const guestsTabAnchor = await temp_page.$(guestsTabAnchorSelector);
         await awaitClick(guestsTabAnchor, temp_page);

@@ -23,8 +23,8 @@ app.route("/")
     const email = req.body.email;
     const passwd = req.body.passwd;
     const date = req.body.date;
-    progressObj.i = 0;
-    progressObj.outof = 1;
+    progressObj.i = 1;
+    progressObj.outof = 30;
 
     scraper.scrape(email, passwd, date, progressObj)
     .then(obj => {
@@ -37,6 +37,10 @@ app.route("/")
         console.log(e);
         res.send(e);
     });
+});
+
+app.get("/prog", (_, res) => {
+    res.send(`${progressObj.i / progressObj.outof}`);
 });
 
 app.get("/data", (_, res) => {
