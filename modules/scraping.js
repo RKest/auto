@@ -2,7 +2,7 @@ const puppeteer = require("puppeteer");
 const util = require("util");
 const sleep = util.promisify(setTimeout);
 const LOCATION = "https://gero.icnea.net";
-const LOGIN_REDIRECT_LOCATION = LOCATION + "/Servidor.aspx";
+const LOGIN_LOCATION = LOCATION + "/Servidor.aspx";
 const DEF_LOCATION = LOCATION + "/HosOrdEntrades.aspx"
 
 const INDIFFERENCE_AMOUNT = 10.0;
@@ -35,7 +35,6 @@ const departureDateSelector = "input#sortida";
 //Guest Tab Selectors
 const guestTableRowSelectorAll = ".table-condensed > tbody > tr";
 const tablePassportNumberSelector = ".table-condensed > tbody > tr > td:nth-child(7)";
-
 
 const splitDateTime = dateStringArray => {
     const ret = [[], []];
@@ -144,29 +143,36 @@ const hasDepositTransactionFunc = async (page, departureDate) => {
    }, departureDate);
 }
 
-const scrape = async (email, passwd) => {
-    const browserURL = "http://127.0.0.1:9222";
-    const browser = await puppeteer.connect({browserURL});
-    const cleanApts = await cleanApartamentNames(browser);
+const scrape = async (email, passwd, date, progressObj) => {
+    //const browserURL = "http://127.0.0.1:9222";
+    //const browser = await puppeteer.connect({browserURL});
+    const browser = await puppeteer.launch({
+        headless: false
+    });
+    try {
     const page = await browser.newPage();
-    const pageUrl = page.url();
-    if(pageUrl === LOGIN_REDIRECT_LOCATION){
-        if(!email || !passwd)
-            throw "Provide email and password";
-        await Promise.all([
-            page.$eval(emailInpSelector,    (el, val) => el.value = val, process.env.EMAIL),
-            page.$eval(passwordInpSelector, (el, val) => el.value = val, process.env.PASSWORD)
-        ]);
-        await awaitClick(loginInpSelector, page);
-        if(page.url() === LOGIN_REDIRECT_LOCATION)
-            throw "Incorrect email or password";
-    }
-    const exactLocation = DEF_LOCATION + "?data=" + searchDayForward();
-    await page.goto(exactLocation, pageGotoOptions);
+    await page.goto(LOGIN_LOCATION, pageGotoOptions);
 
+    if(!email || !passwd)
+        throw "Provide email and password";
+    await Promise.all([
+        page.$eval(emailInpSelector,    (el, val) => el.value = val, email),
+        page.$eval(passwordInpSelector, (el, val) => el.value = val, passwd)
+    ]);
+
+    const loginInp = await page.$(loginInpSelector);
+    await awaitClick(loginInp, page);
+    if(page.url() === LOGIN_LOCATION)
+        throw "Incorrect email or password";
+        
+    const dateString = dateToString(new Date(date));
+    const cleanApts = await cleanApartamentNames(browser);
+    const exactLocation = DEF_LOCATION + "?data=" + dateString;
+    await page.goto(exactLocation, pageGotoOptions);
     var Contents = [];
     var Headers = [];
     const reqQueries = await page.$$eval(tableReqQuerySelectorAll, els => els.map(el => el.href));
+    const reqTexts = await page.$$eval(tableReqQuerySelectorAll, els => els.map(el => el.textContent.trim()));
     for(var i = initialOffset + 1; i < NO_TABLE_COLS; i++){
         const contentsSelectorAll = `.table-condensed > tbody > tr > td:nth-child(${NO_TABLE_COLS}n + ${i})`;
         const headersSelector = `.table-condensed > thead > tr > th:nth-child(${i})`;
@@ -175,6 +181,8 @@ const scrape = async (email, passwd) => {
         Contents.push(data);
         Headers.push(head);
     }
+
+    progressObj.outof = Contents[0].length;
 
     const services = Contents[Contents.length - 1];
     const properties = Contents[tablePropertyOffset];
@@ -191,7 +199,8 @@ const scrape = async (email, passwd) => {
     const areTheApartmentClean = properties.map(el => cleanApts.some(apt => 
             el.toLowerCase().includes(apt.toLowerCase())));
 
-    for(var i = 0; i < reqQueries.length; i++){
+    for(; progressObj.i < reqQueries.length; progressObj.i++){
+        const i = progressObj.i;
         const query = reqQueries[i];
         const temp_page = await browser.newPage();
         temp_page.on('console', message =>
@@ -257,6 +266,12 @@ const scrape = async (email, passwd) => {
         "Are All Passports Valid", "Is Apartment Clean"];
     Contents = [reqTexts, ...Contents, hasPaidThePrices, hasPaidDeposits, hasGuestsFIlledOut, 
         areAllPassportsValids, areTheApartmentClean];
+
+    } catch (e) {
+        browser.close();
+        throw e;
+    }
+    browser.close();
     return {Headers, Contents};
 }
 
@@ -309,16 +324,5 @@ const cleanApartamentNames = async browser => {
     cleaning_page.close();
     return apartmentObjects.filter(el => el.isClean).map(el => el.aptName);
 };
-
-const searchDayForward = () => {
-    const myArgs = process.argv[2] || 0;
-    const num = myArgs[0];
-    const daysForward = new Date();
-
-    daysForward.setDate(daysForward.getDate() + +num).toString(); 
-    console.log(daysForward.getDate()+"/"+(daysForward.getMonth() + 1)+"/"+daysForward.getFullYear());
-    return (daysForward.getDate()+"/"+(daysForward.getMonth() + 1)+"/"+daysForward.getFullYear());
-}
-
 
 exports.scrape = scrape;

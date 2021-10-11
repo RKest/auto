@@ -11,30 +11,35 @@ app.use(express.json());
 const VIEW_PATH = __dirname + "/views";
 const CASHE_PATH = VIEW_PATH + "/table.html";
 
+const progressObj = {i: 0, outof: 1};
+
 app.route("/") 
 .get((req, res) => {
-    console.log(req.method);
     res.sendFile(VIEW_PATH + "/index.html");
+    progressObj.i = 0;
+    progressObj.outof = 1;
 })
 .post((req, res) => {
     const email = req.body.email;
     const passwd = req.body.passwd;
-    const date = JSON.parse(req.body.date);
-    console.log(email, passwd, date);
+    const date = req.body.date;
+    progressObj.i = 0;
+    progressObj.outof = 1;
 
-    scraper.scrape(email, passwd)
+    scraper.scrape(email, passwd, date, progressObj)
     .then(obj => {
         fs.writeFileSync(CASHE_PATH, parser.parse(obj), "utf-8");
         res.statusCode = 200;
-        res.send("http://localhost:8080/data");
+        res.send("http://localhost/data");
     })
     .catch(e => {
         res.statusCode = 400;
+        console.log(e);
         res.send(e);
     });
 });
 
-app.all("/data", (_, res) => {
+app.get("/data", (_, res) => {
     res.sendFile(CASHE_PATH);
 });
 

@@ -1,4 +1,4 @@
-const form = document.querySelector("form");
+const form = document.getElementById("main-form");
 
 form.addEventListener("submit", async e => {
     e.preventDefault();
@@ -6,23 +6,23 @@ form.addEventListener("submit", async e => {
     const passwd = form.elements.passwd.value;
     const date = form.elements.date.value;
 
+    const data = {
+        email, passwd, date
+    }
     fetch("/", 
     { 
         method: "POST" ,
         headers: {
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-            email,
-            passwd,
-            date
-        })
+        body: JSON.stringify(data)
     })
-    .then(res => {
-        if(res.ok){
-            window.open(res.body);
-        } else {
-            alert(res.body);
-        }
+    .then(async res => {
+        const text = await res.text();
+        console.log(text);
+        if(res.ok)
+            window.location.replace(text);
+        else
+            alert(text);
     });
 });
