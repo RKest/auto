@@ -14,7 +14,7 @@ const parse = obj => {
         var contentsString = "";
         for(var j = 0; j < contents.length; j++){
             var cont = contents[j][i];
-            if(cont === true) cont = "✓";
+            if(cont === true)  cont = "✓";
             if(cont === false) cont = "☓";
             contentsString += `<td>${cont}</td>`;
         }

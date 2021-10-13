@@ -195,11 +195,10 @@ const scrape = async (email, passwd, date, progressObj) => {
     Contents = [...splitDatesList, ...Contents.slice(1)];
     Headers = ["Date", "Time", ...Headers.slice(1)];
 
-    const hasGuestsFIlledOut = [];
+    const hasGuestsFIlledOuts = [];
     const hasPaidThePrices = [];
     const hasPaidDeposits = [];
     //const urlGuestApps = [];
-    const paymentDifferences = [];
     const areAllPassportsValids = [];
     const areTheApartmentClean = properties.map(el => cleanApts.some(apt => 
             el.toLowerCase().includes(apt.toLowerCase())));
@@ -224,7 +223,7 @@ const scrape = async (email, passwd, date, progressObj) => {
         const hasVC = await hasVCFunc(temp_page, service);
         const bookingTabAnchor = await temp_page.$(bookingTabAnchorSelector);
         await awaitClick(bookingTabAnchor, temp_page);
-        const VCServices = ["booking", "holidu", "directas", "expedia"]; 
+        const VCServices = ["booking", "holidu", "directas", "expedia", "web"]; 
         if(VCServices.includes(service))
         {
             const toPayAmout                = await toPayAmountFunc(temp_page);
@@ -238,34 +237,31 @@ const scrape = async (email, passwd, date, progressObj) => {
             hasPaidDeposits.push(hasPaidDeposit);
             if(hasVC){
                 hasPaidThePrices.push(true);
-                paymentDifferences.push(0);
             } else {
                 hasPaidThePrices.push(outstandingPayment < INDIFFERENCE_AMOUNT);
-                paymentDifferences.push(outstandingPayment);
             }
         }
         else if(service === "airbnb-online")
         {
             hasPaidDeposits.push(true);
             hasPaidThePrices.push(true);
-            paymentDifferences.push(0);
         }
         else
         {
             console.log(`Unknown service ${service}`);
-            hasPaidDeposits.push(undefined);
-            hasPaidThePrices.push(undefined);
-            paymentDifferences.push(undefined);
+            hasPaidDeposits.push(`Unknown service ${service}`);
+            hasPaidThePrices.push(`Unknown service ${service}`);
         }
 
         const guestsTabAnchor = await temp_page.$(guestsTabAnchorSelector);
         await awaitClick(guestsTabAnchor, temp_page);
 
         const guestTrs = await temp_page.$$(guestTableRowSelectorAll);
-        hasGuestsFIlledOut.push(!!guestTrs.length && guestTrs.length === noPersons);
+        const hasGuestsFilledOut = !!guestTrs.length && guestTrs.length >= noPersons
+        hasGuestsFIlledOuts.push(hasGuestsFilledOut);
         const passportNumbers = await temp_page.$$eval(tablePassportNumberSelector, els => 
             els.map(el => el.textContent.trim()));
-        const areAllPassportNumbersValid = !!passportNumbers.length && passportNumbers.every(isPassportValid);
+        const areAllPassportNumbersValid = hasGuestsFilledOut && passportNumbers.every(isPassportValid);
         areAllPassportsValids.push(areAllPassportNumbersValid);
 
         temp_page.close();
@@ -274,7 +270,7 @@ const scrape = async (email, passwd, date, progressObj) => {
     page.close();
     Headers = ["Booking", ...Headers, "Has Paid", "Has Paid Deposit", "Has Filled Out Guests", 
         "Are All Passports Valid", "Is Apartment Clean"];
-    Contents = [reqTexts, ...Contents, hasPaidThePrices, hasPaidDeposits, hasGuestsFIlledOut, 
+    Contents = [reqTexts, ...Contents, hasPaidThePrices, hasPaidDeposits, hasGuestsFIlledOuts, 
         areAllPassportsValids, areTheApartmentClean];
 
     } catch (e) {
