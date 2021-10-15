@@ -273,7 +273,7 @@ const scrape = async (email, passwd, date, progressObj) => {
         await awaitClick(guestsTabAnchor, temp_page);
 
         const guestTrs = await temp_page.$$(guestTableRowSelectorAll);
-        const hasGuestsFilledOut = !!guestTrs.length && guestTrs.length >= noPersons
+        const hasGuestsFilledOut = !!guestTrs.length;
         hasGuestsFIlledOuts.push(hasGuestsFilledOut);
         const passportNumbers = await temp_page.$$eval(tablePassportNumberSelector, els => 
             els.map(el => el.textContent.trim()));
