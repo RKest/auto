@@ -46,7 +46,7 @@ const gotoWithFallback = async (page, url, ctr = 3) => {
         {
             console.error(`Failed to connect to ${url}, attempting ${ctr} more tires`);
             if(ctr)
-                gotoWithFallback(page, url, ctr - 1);
+                await gotoWithFallback(page, url, ctr - 1);
             else 
                 reject(new Error(`Page failed to load at ${url}`));
         }
