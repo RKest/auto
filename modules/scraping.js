@@ -37,6 +37,22 @@ const departureDateSelector = "input#sortida";
 const guestTableRowSelectorAll = ".table-condensed > tbody > tr";
 const tablePassportNumberSelector = ".table-condensed > tbody > tr > td:nth-child(7)";
 
+const gotoWithFallback = async (page, url, ctr = 3) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            await page.goto(url, pageGotoOptions);
+            resolve();
+        } catch(e)
+        {
+            console.error(`Failed to connect to ${url}, attempting ${ctr} more tires`);
+            if(ctr)
+                gotoWithFallback(page, url, ctr - 1);
+            else 
+                reject(new Error(`Page failed to load at ${url}`));
+        }
+    });
+}
+
 const splitDateTime = dateStringArray => {
     const ret = [[], []];
     for(const dateString of dateStringArray){
@@ -153,7 +169,7 @@ const scrape = async (email, passwd, date, progressObj) => {
     page.on('dialog', async dialog => {
         await dialog.dismiss();
     });
-    await page.goto(LOGIN_LOCATION, pageGotoOptions);
+    await gotoWithFallback(page, LOGIN_LOCATION);
 
     if(!email || !passwd)
         throw "Provide email and password";
@@ -170,7 +186,7 @@ const scrape = async (email, passwd, date, progressObj) => {
     const dateAsDate = date ? new Date(date) : new Date();
     const dateString = dateToString(dateAsDate);
     const exactLocation = DEF_LOCATION + "?data=" + dateString;
-    await page.goto(exactLocation, pageGotoOptions);
+    await gotoWithFallback(page, exactLocation);
     var Contents = [];
     var Headers = [];
     const reqQueries = await page.$$eval(tableReqQuerySelectorAll, els => els.map(el => el.href));
@@ -209,7 +225,7 @@ const scrape = async (email, passwd, date, progressObj) => {
         const temp_page = await browser.newPage();
         temp_page.on('console', message =>
             console.log(`${message.type().substr(0, 3).toUpperCase()} ${message.text()}`));
-        await temp_page.goto(query, pageGotoOptions);
+        await gotoWithFallback(temp_page, query);
         await temp_page.exposeFunction("nDaysFromGivenDate", nDaysFromGivenDate);
         await temp_page.exposeFunction("dateFromString", dateFromString);
         
@@ -248,9 +264,9 @@ const scrape = async (email, passwd, date, progressObj) => {
         }
         else
         {
-            console.log(`Unknown service ${service}`);
-            hasPaidDeposits.push(`Unknown service ${service}`);
-            hasPaidThePrices.push(`Unknown service ${service}`);
+            console.log("Unknown service");
+            hasPaidDeposits.push("Unknown service");
+            hasPaidThePrices.push("Unknown service");
         }
 
         const guestsTabAnchor = await temp_page.$(guestsTabAnchorSelector);
@@ -299,12 +315,20 @@ const cleanApartamentNames = async browser => {
     const cleanClassName = "text-success";
     const cleaningsUri = "https://gero.icnea.net/HosOrdNetejes.aspx";
     const cleaning_page = await browser.newPage();
-    await cleaning_page.goto(cleaningsUri, pageGotoOptions);
+    cleaning_page.on("console", message => console.log(message.text));
+    await gotoWithFallback(cleaning_page, cleaningsUri);
     const apartmentObjects = await cleaning_page.$$eval(apartmentCleaningTrSelAll, (els, cleanClassName) => 
         els.map(el => {
             const secondNode = el.childNodes[1]; 
             const leafNode = secondNode.childNodes[1];
             const textNode = el.childNodes[5].childNodes[1];
+            if(textNode === undefined)
+            {
+                return {
+                    aptName: "No apt name found",
+                    isClean: false
+                }
+            }
             const textNodeContent = textNode.textContent.trim();
             if(leafNode === undefined){
                 return {
